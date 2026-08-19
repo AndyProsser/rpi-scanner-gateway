@@ -1,0 +1,9 @@
+[Unit]
+Description=Delete local scan backups older than retention period
+
+[Service]
+Type=oneshot
+User=scanpipeline
+WorkingDirectory=/opt/scan-pipeline
+Environment=PYTHONPATH=/opt/scan-pipeline
+ExecStart=/opt/scan-pipeline/venv/bin/python scripts/retention_cleanup.py

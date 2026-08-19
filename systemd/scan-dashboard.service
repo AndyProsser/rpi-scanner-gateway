@@ -1,0 +1,19 @@
+[Unit]
+Description=Scan pipeline monitoring dashboard
+After=network-online.target tailscaled.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=scanpipeline
+WorkingDirectory=/opt/scan-pipeline
+Environment=PYTHONPATH=/opt/scan-pipeline
+ExecStart=/opt/scan-pipeline/venv/bin/python -m app.dashboard
+Restart=on-failure
+RestartSec=10
+
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

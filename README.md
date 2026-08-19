@@ -1,2 +1,37 @@
-# rpi-scanner-gateway
-Turn a Raspberry Pi into a MFP Scanner Gateway
+# Uncle's Scan Pipeline
+
+Brother MFP → SMB scan-to-folder on a Raspberry Pi 3B → strip blank pages →
+OCR + compress → local 30-day backup → OneDrive upload → email notification.
+Plus a tiny dashboard to monitor it, reachable over Tailscale.
+
+## Structure
+
+```
+app/
+  config.py          # all settings, loaded from .env
+  db.py               # SQLite job tracking (single table, WAL mode)
+  blank_pages.py       # pre-OCR blank page detection/removal
+  ocr.py               # ocrmypdf wrapper + thumbnail generation
+  graph.py             # Microsoft Graph: OneDrive upload + Send Mail
+  watcher.py            # orchestrator — watches inbox, runs the pipeline
+  dashboard.py           # Flask app (simple view + /details)
+  templates/, static/     # dashboard HTML/CSS
+scripts/
+  retention_cleanup.py    # deletes local backups older than 30 days
+  samba-scan-share.conf    # Samba config snippet for the SMB scan target
+systemd/                   # service + timer units for all three processes
+docs/SETUP.md               # full one-time setup walkthrough — start here
+```
+
+## Setup
+
+Follow **[docs/SETUP.md](docs/SETUP.md)** top to bottom — it covers the Pi
+OS packages, Samba share, Brother panel configuration, Graph app
+registration (with the Mail.Send scoping you'll want as tenant admin),
+Tailscale, and the systemd services.
+
+## Status flow
+
+Each scan moves through: `received → ocr_running → uploading → done`
+(or `failed`, with the error preserved and visible on `/details`, and the
+original file kept in `/srv/scans/failed` for reprocessing).

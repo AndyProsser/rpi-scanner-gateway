@@ -1,0 +1,88 @@
+"""
+Tiny monitoring dashboard.
+
+  /          simple view — big status of the most recent scan (for your uncle)
+  /details   full job history with sizes, errors, thumbnails (for you)
+  /thumb/<job_id>  serves the page-1 thumbnail image
+
+Runs on the Pi, reachable only over Tailscale (see docs/SETUP.md).
+"""
+from flask import Flask, render_template, send_file, abort
+from pathlib import Path
+
+from app.config import config
+from app import db
+
+app = Flask(__name__)
+
+STATUS_LABELS = {
+    "received": ("Received", "neutral"),
+    "ocr_running": ("Processing…", "working"),
+    "uploading": ("Uploading…", "working"),
+    "done": ("Sent \u2705", "good"),
+    "failed": ("Failed \u274c", "bad"),
+}
+
+
+def _fmt_size(num_bytes):
+    if not num_bytes:
+        return "—"
+    mb = num_bytes / (1024 * 1024)
+    return f"{mb:.1f} MB"
+
+
+def _fmt_time(ts):
+    if not ts:
+        return "—"
+    import datetime
+    return datetime.datetime.fromtimestamp(ts).strftime("%b %d, %I:%M %p")
+
+
+def _enrich(job):
+    j = dict(job)
+    label, css_class = STATUS_LABELS.get(j["status"], (j["status"], "neutral"))
+    j["status_label"] = label
+    j["status_class"] = css_class
+    j["created_at_fmt"] = _fmt_time(j["created_at"])
+    j["original_size_fmt"] = _fmt_size(j["original_size_bytes"])
+    j["compressed_size_fmt"] = _fmt_size(j["compressed_size_bytes"])
+    if j["original_size_bytes"] and j["compressed_size_bytes"]:
+        saved_pct = 100 * (1 - j["compressed_size_bytes"] / j["original_size_bytes"])
+        j["saved_pct"] = round(saved_pct)
+    else:
+        j["saved_pct"] = None
+    return j
+
+
+@app.route("/")
+def index():
+    latest = db.get_latest_job()
+    job = _enrich(latest) if latest else None
+    return render_template("index.html", job=job)
+
+
+@app.route("/details")
+def details():
+    jobs = [_enrich(j) for j in db.list_jobs(limit=100)]
+    return render_template("details.html", jobs=jobs)
+
+
+@app.route("/thumb/<int:job_id>")
+def thumb(job_id):
+    job = db.get_job(job_id)
+    if not job or not job["thumbnail_path"]:
+        abort(404)
+    path = Path(job["thumbnail_path"])
+    if not path.exists():
+        abort(404)
+    return send_file(path, mimetype="image/png")
+
+
+def main():
+    config.ensure_dirs()
+    db.init_db()
+    app.run(host=config.DASHBOARD_HOST, port=config.DASHBOARD_PORT)
+
+
+if __name__ == "__main__":
+    main()

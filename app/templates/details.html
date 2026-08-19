@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="refresh" content="20">
+    <title>Scan Job History</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>.container { max-width: 1100px; }</style>
+</head>
+<body>
+<div class="container">
+    <h1>📠 Scan Job History <a href="/" style="font-size:0.9rem; font-weight:normal;">← simple view</a></h1>
+
+    {% if jobs %}
+    <table>
+        <thead>
+        <tr>
+            <th></th>
+            <th>File</th>
+            <th>Status</th>
+            <th>When</th>
+            <th>Pages</th>
+            <th>Size</th>
+            <th>Links</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for job in jobs %}
+        <tr>
+            <td>
+                {% if job.thumbnail_path %}
+                <img class="thumb" src="/thumb/{{ job.id }}" alt="">
+                {% endif %}
+            </td>
+            <td>{{ job.filename }}</td>
+            <td>
+                <span class="badge {{ job.status_class }}">{{ job.status_label }}</span>
+                {% if job.error_message %}
+                <div class="error-msg">{{ job.error_message }}</div>
+                {% endif %}
+            </td>
+            <td>{{ job.created_at_fmt }}</td>
+            <td>
+                {{ job.page_count or '—' }}
+                {% if job.blank_pages_removed %}
+                <div class="savings">{{ job.blank_pages_removed }} blank removed</div>
+                {% endif %}
+            </td>
+            <td>
+                {{ job.compressed_size_fmt }}
+                {% if job.saved_pct %}
+                <div class="savings">-{{ job.saved_pct }}% vs original</div>
+                {% endif %}
+            </td>
+            <td>
+                {% if job.onedrive_link %}<a href="{{ job.onedrive_link }}" target="_blank">OneDrive</a>{% endif %}
+                {% if job.email_sent %} &middot; Emailed{% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">No scans yet.</div>
+    {% endif %}
+</div>
+</body>
+</html>
