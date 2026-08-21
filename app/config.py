@@ -10,13 +10,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
 
 
-def _req(name: str) -> str:
-    val = os.getenv(name)
-    if not val:
-        raise RuntimeError(f"Missing required env var: {name}. Check your .env file.")
-    return val
-
-
 def _int(name: str, default: int) -> int:
     return int(os.getenv(name, default))
 
@@ -38,19 +31,34 @@ class Config:
     OCR_LANGUAGE = os.getenv("OCR_LANGUAGE", "eng")
     BLANK_PAGE_THRESHOLD = float(os.getenv("BLANK_PAGE_THRESHOLD", "0.995"))  # % white pixels
 
-    # --- Microsoft Graph (app registration, client credentials or delegated) ---
+    # --- Email sending ---
+    EMAIL_PROVIDER = os.getenv("EMAIL_PROVIDER", "smtp")  # smtp | graph
+    RECIPIENT_EMAIL = os.getenv("RECIPIENT_EMAIL", "")  # who receives the scan notification
+
+    # SMTP (Gmail / Microsoft Live / Apple iCloud / cPanel / any standard SMTP account)
+    SMTP_HOST = os.getenv("SMTP_HOST", "")
+    SMTP_PORT = _int("SMTP_PORT", 587)  # 465 = implicit SSL, anything else = STARTTLS
+    SMTP_USERNAME = os.getenv("SMTP_USERNAME", "")
+    SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
+    SMTP_FROM_ADDRESS = os.getenv("SMTP_FROM_ADDRESS", "")
+
+    # --- Microsoft Graph ---
     GRAPH_TENANT_ID = os.getenv("GRAPH_TENANT_ID", "")
     GRAPH_CLIENT_ID = os.getenv("GRAPH_CLIENT_ID", "")
+    # Client-secret auth — still used by upload_to_onedrive() in app/graph.py.
+    # Not used by the email backend, which uses the certificate pair below.
     GRAPH_CLIENT_SECRET = os.getenv("GRAPH_CLIENT_SECRET", "")
-    # Delegated flow needs a refresh token cached via MSAL token cache file
-    GRAPH_TOKEN_CACHE_PATH = Path(os.getenv("GRAPH_TOKEN_CACHE_PATH", "/srv/scans/msal_token_cache.json"))
-    GRAPH_SCOPES = os.getenv("GRAPH_SCOPES", "Mail.Send Files.ReadWrite").split()
-
-    # --- Email ---
-    UNCLE_EMAIL = os.getenv("UNCLE_EMAIL", "")
-    SEND_FROM_MAILBOX = os.getenv("SEND_FROM_MAILBOX", "")  # UPN of the mailbox sending the email
+    # Certificate auth — used by app/email/graph_sender.py via app/graph_auth.py.
+    GRAPH_CERT_PATH = os.getenv("GRAPH_CERT_PATH", "/opt/scan-pipeline/certs/graph-app.key")
+    GRAPH_CERT_THUMBPRINT = os.getenv("GRAPH_CERT_THUMBPRINT", "")
+    SEND_FROM_MAILBOX = os.getenv("SEND_FROM_MAILBOX", "")  # UPN of the mailbox sending Graph email
 
     # --- OneDrive ---
+    # UNCLE_EMAIL is the OneDrive upload target for upload_to_onedrive() in app/graph.py
+    # (distinct from RECIPIENT_EMAIL above, which is who gets the email). They're the
+    # same address in the uncle deployment today, but kept separate since a future
+    # storage backend or recipient could differ.
+    UNCLE_EMAIL = os.getenv("UNCLE_EMAIL", "")
     ONEDRIVE_FOLDER_PATH = os.getenv("ONEDRIVE_FOLDER_PATH", "/Scanned Documents")
 
     # --- Dashboard ---
