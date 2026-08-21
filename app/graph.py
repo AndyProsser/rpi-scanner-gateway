@@ -9,7 +9,7 @@ Client credentials + a secret just works indefinitely with zero babysitting.
 
 Required Entra app registration:
   - Application permission (admin-consented): Files.ReadWrite.All
-  - Upload goes to /users/{UNCLE_EMAIL}/drive/... — Files.ReadWrite.All
+  - Upload goes to /users/{ONEDRIVE_USER_EMAIL}/drive/... — Files.ReadWrite.All
     grants access tenant-wide, so restrict via an Application Access Policy
     if your tenant supports it, or accept the broader grant for a
     single-user tenant.
@@ -47,7 +47,7 @@ def _headers() -> dict:
 
 def upload_to_onedrive(local_path: str, filename: str) -> str:
     """
-    Uploads to config.ONEDRIVE_FOLDER_PATH in the uncle's OneDrive.
+    Uploads to config.ONEDRIVE_FOLDER_PATH in the target user's OneDrive.
     Uses a simple PUT for files under 4MB, resumable upload session above that
     (scanned PDFs after compression are usually well under 4MB, but 15-20 page
     docs with images can exceed it).
@@ -55,7 +55,7 @@ def upload_to_onedrive(local_path: str, filename: str) -> str:
     """
     file_size = Path(local_path).stat().st_size
     remote_path = f"{config.ONEDRIVE_FOLDER_PATH.strip('/')}/{filename}"
-    user = config.UNCLE_EMAIL
+    user = config.ONEDRIVE_USER_EMAIL
 
     if file_size <= 4 * 1024 * 1024:
         url = f"{GRAPH_BASE}/users/{user}/drive/root:/{remote_path}:/content"

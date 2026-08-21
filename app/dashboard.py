@@ -1,7 +1,7 @@
 """
 Tiny monitoring dashboard.
 
-  /          simple view — big status of the most recent scan (for your uncle)
+  /          simple view — big status of the most recent scan (for the recipient)
   /details   full job history with sizes, errors, thumbnails (for you)
   /thumb/<job_id>  serves the page-1 thumbnail image
 

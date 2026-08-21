@@ -54,11 +54,11 @@ class Config:
     SEND_FROM_MAILBOX = os.getenv("SEND_FROM_MAILBOX", "")  # UPN of the mailbox sending Graph email
 
     # --- OneDrive ---
-    # UNCLE_EMAIL is the OneDrive upload target for upload_to_onedrive() in app/graph.py
-    # (distinct from RECIPIENT_EMAIL above, which is who gets the email). They're the
-    # same address in the uncle deployment today, but kept separate since a future
-    # storage backend or recipient could differ.
-    UNCLE_EMAIL = os.getenv("UNCLE_EMAIL", "")
+    # ONEDRIVE_USER_EMAIL is the OneDrive upload target for upload_to_onedrive() in
+    # app/graph.py (distinct from RECIPIENT_EMAIL above, which is who gets the email).
+    # They may be the same address in a single-recipient deployment, but are kept
+    # separate since a future storage backend or recipient could differ.
+    ONEDRIVE_USER_EMAIL = os.getenv("ONEDRIVE_USER_EMAIL", "")
     ONEDRIVE_FOLDER_PATH = os.getenv("ONEDRIVE_FOLDER_PATH", "/Scanned Documents")
 
     # --- Dashboard ---

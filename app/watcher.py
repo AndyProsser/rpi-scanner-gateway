@@ -1,5 +1,5 @@
 """
-Watches SCAN_INBOX for new PDFs dropped by the Brother's SMB scan-to-folder
+Watches SCAN_INBOX for new PDFs dropped by the Printer's SMB scan-to-folder
 job, then runs the full pipeline:
 
   1. Wait for the file to finish writing (SMB writes aren't instantaneous)
@@ -8,7 +8,7 @@ job, then runs the full pipeline:
   4. Generate thumbnail
   5. Archive a local copy (kept RETENTION_DAYS)
   6. Upload to OneDrive
-  7. Email the uncle
+  7. Email the recipient
   8. Update dashboard DB at every step so failures are visible, not silent
 
 Run as a systemd service (see systemd/scan-watcher.service) so it survives
@@ -106,7 +106,7 @@ def process_file(src_path: Path):
         onedrive_link = upload_to_onedrive(str(ocr_output_path), filename)
         db.update_job(job_id, onedrive_link=onedrive_link)
 
-        # --- Step 6: email the uncle ---
+        # --- Step 6: email the recipient ---
         size_mb = compressed_size / (1024 * 1024)
         body = f"""
         <p>Hi,</p>

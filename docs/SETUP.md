@@ -1,4 +1,4 @@
-# Setup Guide — Uncle's Scan Pipeline
+# Setup Guide — RPi MFP Scanning Pipeline
 
 One-time setup, in order. Budget ~2 hours including OCR test runs.
 
@@ -43,7 +43,7 @@ cp .env.example .env
 sudo chown -R scanpipeline:scanpipeline /opt/scan-pipeline
 ```
 
-## 4. Samba share (the Brother's scan target)
+## 4. Samba share (the Printer's scan target)
 
 ```bash
 sudo tee -a /etc/samba/smb.conf < scripts/samba-scan-share.conf
@@ -51,11 +51,11 @@ sudo smbpasswd -a scanner        # pick a password, note it down
 sudo systemctl restart smbd
 ```
 
-Test from your Mac/PC before touching the Brother:
+Test from your Mac/PC before touching the Printer:
 `smb://<pi-ip-or-tailscale-name>/scans` — connect as user `scanner`, confirm
 you can drop a test PDF in.
 
-## 5. Brother panel — Scan to Network Folder shortcut
+## 5. Printer panel — Scan to Network Folder shortcut
 
 On the MFP touchscreen (menu wording varies slightly by model):
 
@@ -73,7 +73,7 @@ On the MFP touchscreen (menu wording varies slightly by model):
      files, faster OCR. Only use Color if he's scanning something with
      color content that matters.
 3. Assign it to a **Shortcut button** on the home screen, name it something
-   your uncle will recognize — "Scan to Andy" or similar.
+   recognizable for whoever uses the printer — "Scan to Office" or similar.
 4. Test: scan a page, confirm it lands in `/srv/scans/inbox` on the Pi.
 
 ## 6. Email provider setup
@@ -145,8 +145,8 @@ Still uses the client-secret Graph flow. If you want the local archive
 copy also mirrored to OneDrive, follow the app registration steps above
 but also add a client secret (**Certificates & secrets → New client
 secret**) for `GRAPH_CLIENT_SECRET`, grant `Files.ReadWrite.All`, and set
-`UNCLE_EMAIL` to whose OneDrive receives the upload. This will move onto
-the same certificate as email sending in a future update.
+`ONEDRIVE_USER_EMAIL` to whose OneDrive receives the upload. This will move
+onto the same certificate as email sending in a future update.
 
 ## 7. Tailscale
 
@@ -155,15 +155,15 @@ curl -fsSL https://tailscale.com/install.sh | sh
 sudo tailscale up
 ```
 
-Authenticate against your tailnet (the one shared with your uncle and,
-later, your dad's server). Note the MagicDNS name it's assigned
-(e.g. `scanner-pi`) — that's what you'll use to reach the dashboard:
-`http://scanner-pi:5000`.
+Authenticate against your tailnet — the one you'll share with anyone else
+who needs to reach the dashboard or the Pi. Note the MagicDNS name it's
+assigned (e.g. `scanner-pi`) — that's what you'll use to reach the
+dashboard: `http://scanner-pi:5000`.
 
-If you want your uncle to check the simple view himself, install Tailscale
-on his Mac too and share the Pi node with his account (node sharing is
-included free — see Tailscale's Personal plan). Otherwise this stays
-just for you.
+If you want the scan recipient to check the simple view themselves, install
+Tailscale on their device too and share the Pi node with their account
+(node sharing is included free — see Tailscale's Personal plan). Otherwise
+this stays just for you.
 
 ## 8. Install and start the services
 
@@ -185,7 +185,7 @@ sudo journalctl -u scan-watcher -f     # tail logs live while testing
 ## 9. End-to-end test
 
 1. Scan a multi-page test document (include a deliberately blank page)
-   from the Brother using the shortcut button.
+   from the Printer using the shortcut button.
 2. Watch `journalctl -u scan-watcher -f` — you should see it move through
    received → OCR → uploading → done.
 3. Check the dashboard at `http://scanner-pi:5000`.
