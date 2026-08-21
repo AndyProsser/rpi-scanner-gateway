@@ -14,7 +14,7 @@ choice.
 ```bash
 sudo apt update && sudo apt full-upgrade -y
 sudo apt install -y python3-venv python3-pip samba tesseract-ocr \
-    ghostscript jbig2enc git
+    ghostscript jbig2enc git avahi-daemon
 ```
 
 `jbig2enc` isn't always packaged for ARM on Raspberry Pi OS — if `apt install jbig2enc`
@@ -175,6 +175,17 @@ sudo systemctl enable --now scan-watcher.service
 sudo systemctl enable --now scan-dashboard.service
 sudo systemctl enable --now retention-cleanup.timer
 ```
+
+Also install the mDNS advertisement so the dashboard is discoverable on the
+local network as "Scanner Gateway" (no Tailscale needed, LAN only — see
+`avahi/scanner-gateway.service`'s comment for how this differs from the
+Tailscale MagicDNS name from step 7):
+
+```bash
+sudo cp avahi/scanner-gateway.service /etc/avahi/services/
+```
+
+`avahi-daemon` picks up new service files automatically; no restart needed.
 
 Check it's alive:
 ```bash

@@ -22,6 +22,7 @@ scripts/
   retention_cleanup.py       # deletes local backups older than 30 days
   samba-scan-share.conf      # Samba config snippet for the SMB scan target
 systemd/                     # service + timer units for all three processes
+avahi/                        # LAN mDNS service advertisement (no Tailscale needed)
 docs/SETUP.md                # full one-time setup walkthrough — start here
 ```
 
