@@ -39,7 +39,7 @@ cd /opt/scan-pipeline
 python3 -m venv venv
 ./venv/bin/pip install -r requirements.txt
 cp .env.example .env
-# edit .env — you'll fill in the Graph values in step 6
+# edit .env — you'll fill in the email provider values in step 6
 sudo chown -R scanpipeline:scanpipeline /opt/scan-pipeline
 ```
 
@@ -76,23 +76,54 @@ On the MFP touchscreen (menu wording varies slightly by model):
    your uncle will recognize — "Scan to Andy" or similar.
 4. Test: scan a page, confirm it lands in `/srv/scans/inbox` on the Pi.
 
-## 6. Microsoft Graph app registration
+## 6. Email provider setup
 
-You have tenant admin, so:
+Pick one and set `EMAIL_PROVIDER` accordingly in `.env`.
+
+### Option A — SMTP (`EMAIL_PROVIDER=smtp`)
+
+Works for cPanel-hosted email, Gmail, Microsoft Live (personal), and Apple
+iCloud Mail — same protocol, different host/port/credentials:
+
+| Provider | SMTP_HOST | SMTP_PORT | SMTP_USERNAME |
+|---|---|---|---|
+| cPanel | usually `mail.yourdomain.com`, or check your host's docs/cPanel's "Email Accounts" page | `587` (STARTTLS) or `465` (SSL) — cPanel shows both | full email address |
+| Gmail | `smtp.gmail.com` | `587` | full email address (needs an [app password](https://myaccount.google.com/apppasswords), not your regular password) |
+| Microsoft Live (personal, not M365 tenant) | `smtp.office365.com` or `smtp-mail.outlook.com` — check your account type | `587` | full email address |
+| Apple iCloud Mail | `smtp.mail.me.com` | `587` | full iCloud email + an [app-specific password](https://support.apple.com/en-us/102654) |
+
+`SMTP_FROM_ADDRESS` is usually the same as `SMTP_USERNAME`. `RECIPIENT_EMAIL`
+is whoever should get the "scan ready" notification.
+
+Confirm the exact host/port with your provider's current documentation —
+these change occasionally and the table above may drift.
+
+### Option B — Microsoft Graph (`EMAIL_PROVIDER=graph`)
+
+For M365 tenants with Global Admin access, using certificate auth (no
+client secret to rotate/leak):
+
+```bash
+openssl req -x509 -newkey rsa:2048 -keyout graph-app.key -out graph-app.crt \
+    -days 730 -nodes -subj "/CN=rpi-scanner-gateway"
+openssl x509 -in graph-app.crt -noout -fingerprint -sha1
+```
 
 1. **Entra admin center → App registrations → New registration**
-   - Name: `Uncle Scan Pipeline`
+   - Name: e.g. `Scanner Gateway`
    - Supported account types: single tenant
-2. **Certificates & secrets → New client secret** — copy the value immediately
-   (shown once). This is `GRAPH_CLIENT_SECRET`.
-3. **API permissions → Add a permission → Microsoft Graph → Application permissions:**
-   - `Mail.Send`
-   - `Files.ReadWrite.All`
-   - Click **Grant admin consent** (you can do this yourself with your access).
-4. Copy **Application (client) ID** → `GRAPH_CLIENT_ID`, and
-   **Directory (tenant) ID** → `GRAPH_TENANT_ID`.
+2. **Certificates & secrets → Certificates → Upload certificate** — upload
+   `graph-app.crt`. The `-fingerprint -sha1` output from above, with the
+   colons removed, is `GRAPH_CERT_THUMBPRINT`.
+3. **API permissions → Add a permission → Microsoft Graph → Application
+   permissions:** `Mail.Send`, then **Grant admin consent**.
+4. Copy **Application (client) ID** → `GRAPH_CLIENT_ID`, and **Directory
+   (tenant) ID** → `GRAPH_TENANT_ID`.
+5. Put `graph-app.key` on the Pi at the path in `GRAPH_CERT_PATH`
+   (default `/opt/scan-pipeline/certs/graph-app.key`), `chmod 600`, owned
+   by `scanpipeline`. **Never commit it** — it's covered by `.gitignore`.
 
-### Lock down Mail.Send (important)
+### Lock down Mail.Send (important, Option B only)
 
 App-only `Mail.Send` without scoping lets this app send as *any* mailbox in
 the tenant. Restrict it to just the sending mailbox via Exchange Online
@@ -106,23 +137,16 @@ New-ApplicationAccessPolicy -AppId "<GRAPH_CLIENT_ID>" `
     -Description "Scan pipeline - restrict to scanner mailbox only"
 ```
 
-If `scanner@yourtenant.com` is a real mailbox (recommended — either a
-licensed shared mailbox or a small standalone license), it needs `Mail.Send`
-rights on itself, which the policy above grants exclusively to this app.
+Set `SEND_FROM_MAILBOX` to that same mailbox.
 
-### Fill in .env
+### OneDrive backup (optional, independent of the above)
 
-```
-GRAPH_TENANT_ID=<from step 6.4>
-GRAPH_CLIENT_ID=<from step 6.4>
-GRAPH_CLIENT_SECRET=<from step 6.2>
-UNCLE_EMAIL=<his real M365 address>
-SEND_FROM_MAILBOX=scanner@yourtenant.com
-ONEDRIVE_FOLDER_PATH=/Scanned Documents
-```
-
-`Files.ReadWrite.All` app-only writes to `/users/{UNCLE_EMAIL}/drive/...` —
-his own OneDrive, not the sending mailbox's.
+Still uses the client-secret Graph flow. If you want the local archive
+copy also mirrored to OneDrive, follow the app registration steps above
+but also add a client secret (**Certificates & secrets → New client
+secret**) for `GRAPH_CLIENT_SECRET`, grant `Files.ReadWrite.All`, and set
+`UNCLE_EMAIL` to whose OneDrive receives the upload. This will move onto
+the same certificate as email sending in a future update.
 
 ## 7. Tailscale
 
