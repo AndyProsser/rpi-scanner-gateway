@@ -4,6 +4,13 @@ One-time setup, in order. Budget ~2 hours including OCR test runs.
 
 ## 1. Raspberry Pi OS base
 
+Flash **64-bit** Raspberry Pi OS (Bookworm or later), not 32-bit. `pikepdf`,
+`Pillow`, and `PyMuPDF` only publish prebuilt wheels for aarch64 — on 32-bit
+armv7l, pip falls back to building them from source (pikepdf alone needs a
+Rust toolchain and qpdf headers), which is slow and often fails outright on
+a Pi 3B. The Pi 3B has a 64-bit-capable CPU, so this is just an OS image
+choice.
+
 ```bash
 sudo apt update && sudo apt full-upgrade -y
 sudo apt install -y python3-venv python3-pip samba tesseract-ocr \
