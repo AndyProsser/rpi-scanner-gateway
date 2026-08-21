@@ -70,7 +70,7 @@ On the MFP touchscreen (menu wording varies slightly by model):
    - **Resolution:** 300 dpi (600dpi roughly doubles OCR time and file size for
      no real quality benefit on text documents)
    - **Color:** Black & White or Grey for contracts/disclosures — smaller
-     files, faster OCR. Only use Color if he's scanning something with
+     files, faster OCR. Only use Color if you're scanning something with
      color content that matters.
 3. Assign it to a **Shortcut button** on the home screen, name it something
    recognizable for whoever uses the printer — "Scan to Office" or similar.
@@ -199,4 +199,4 @@ sudo journalctl -u scan-watcher -f     # tail logs live while testing
 - If a scan fails, it's visible on `/details` with the error message, and
   the original is preserved in `/srv/scans/failed` for reprocessing.
 - Client secret expiry: Entra secrets typically max out at 24 months —
-  put a reminder in your own calendar, not his.
+  put a reminder in your calendar.
