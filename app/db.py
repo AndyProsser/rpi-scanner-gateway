@@ -25,6 +25,11 @@ CREATE TABLE IF NOT EXISTS jobs (
     error_message TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_jobs_created_at ON jobs(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
 """
 
 
@@ -91,3 +96,24 @@ def jobs_older_than(cutoff_timestamp: float):
             "SELECT * FROM jobs WHERE created_at < ? AND archive_path IS NOT NULL",
             (cutoff_timestamp,),
         ).fetchall()
+
+
+def get_setting(key: str, default: str | None = None) -> str | None:
+    with get_db() as conn:
+        row = conn.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
+        return row["value"] if row else default
+
+
+def set_setting(key: str, value: str):
+    with get_db() as conn:
+        conn.execute(
+            "INSERT INTO settings (key, value) VALUES (?, ?) "
+            "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            (key, value),
+        )
+
+
+def get_recipient_email() -> str:
+    """DB-stored override (settable from the dashboard's /settings page)
+    takes precedence over config.RECIPIENT_EMAIL from .env."""
+    return get_setting("recipient_email") or config.RECIPIENT_EMAIL

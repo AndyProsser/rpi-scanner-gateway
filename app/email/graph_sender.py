@@ -11,6 +11,7 @@ from pathlib import Path
 
 import requests
 
+from app import db
 from app.config import config
 from app.email.base import EmailError, EmailSender, require_config
 from app.graph_auth import GraphAuthError, get_token
@@ -25,7 +26,7 @@ class GraphSender(EmailSender):
         self.cert_path = require_config("GRAPH_CERT_PATH", str(config.GRAPH_CERT_PATH))
         self.cert_thumbprint = require_config("GRAPH_CERT_THUMBPRINT", config.GRAPH_CERT_THUMBPRINT)
         self.from_mailbox = require_config("SEND_FROM_MAILBOX", config.SEND_FROM_MAILBOX)
-        self.recipient = require_config("RECIPIENT_EMAIL", config.RECIPIENT_EMAIL)
+        self.recipient = require_config("RECIPIENT_EMAIL", db.get_recipient_email())
 
     def send(self, subject: str, body_html: str, attachment_path: str | None = None) -> None:
         message = {

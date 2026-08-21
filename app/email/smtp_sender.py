@@ -14,6 +14,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from pathlib import Path
 
+from app import db
 from app.config import config
 from app.email.base import EmailError, EmailSender, require_config
 
@@ -25,7 +26,7 @@ class SmtpSender(EmailSender):
         self.username = require_config("SMTP_USERNAME", config.SMTP_USERNAME)
         self.password = require_config("SMTP_PASSWORD", config.SMTP_PASSWORD)
         self.from_address = require_config("SMTP_FROM_ADDRESS", config.SMTP_FROM_ADDRESS)
-        self.recipient = require_config("RECIPIENT_EMAIL", config.RECIPIENT_EMAIL)
+        self.recipient = require_config("RECIPIENT_EMAIL", db.get_recipient_email())
 
     def send(self, subject: str, body_html: str, attachment_path: str | None = None) -> None:
         msg = MIMEMultipart()
