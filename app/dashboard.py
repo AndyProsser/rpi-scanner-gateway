@@ -23,6 +23,7 @@ import hmac
 import re
 import secrets
 import time
+from collections import defaultdict
 from flask import Flask, render_template, send_file, abort, request, redirect, url_for, g
 from pathlib import Path
 
@@ -36,6 +37,10 @@ _CSRF_COOKIE = "csrf_token"
 _AUTH_COOKIE = "settings_auth"
 _AUTH_TTL_SECONDS = 24 * 3600
 
+_MAX_LOGIN_ATTEMPTS = 5
+_LOGIN_LOCKOUT_SECONDS = 300
+_login_failures = defaultdict(list)  # ip -> [failure timestamps], in-memory only
+
 
 @app.before_request
 def _load_csrf_token():
@@ -45,7 +50,7 @@ def _load_csrf_token():
 @app.after_request
 def _persist_csrf_cookie(response):
     if request.cookies.get(_CSRF_COOKIE) != g.get("csrf_token"):
-        response.set_cookie(_CSRF_COOKIE, g.csrf_token, samesite="Strict", httponly=True)
+        response.set_cookie(_CSRF_COOKIE, g.csrf_token, samesite="Strict", httponly=True, secure=request.is_secure)
     return response
 
 
@@ -61,11 +66,30 @@ def _require_csrf():
         abort(403)
 
 
+def _login_rate_limited(ip: str) -> bool:
+    cutoff = time.time() - _LOGIN_LOCKOUT_SECONDS
+    _login_failures[ip] = [t for t in _login_failures[ip] if t > cutoff]
+    return len(_login_failures[ip]) >= _MAX_LOGIN_ATTEMPTS
+
+
+def _record_login_failure(ip: str):
+    _login_failures[ip].append(time.time())
+
+
+def _clear_login_failures(ip: str):
+    _login_failures.pop(ip, None)
+
+
+def _auth_signing_key() -> bytes:
+    # SHA-256 of the password rather than the raw password bytes -- normalizes
+    # key length and avoids using a possibly-short/user-typed secret directly
+    # as an HMAC key. Still keyed by the password (no separate SECRET_KEY), so
+    # changing the password still invalidates every existing signed-in cookie.
+    return hashlib.sha256(config.DASHBOARD_SETTINGS_PASSWORD.encode()).digest()
+
+
 def _sign_auth_timestamp(timestamp: str) -> str:
-    # Keyed by the configured password itself -- no separate SECRET_KEY needed,
-    # and changing the password automatically invalidates every existing
-    # signed-in cookie.
-    return hmac.new(config.DASHBOARD_SETTINGS_PASSWORD.encode(), timestamp.encode(), hashlib.sha256).hexdigest()
+    return hmac.new(_auth_signing_key(), timestamp.encode(), hashlib.sha256).hexdigest()
 
 
 def _make_auth_cookie_value() -> str:
@@ -188,11 +212,17 @@ def settings():
         login_error = None
         if request.method == "POST":
             _require_csrf()
-            if secrets.compare_digest(request.form.get("password", ""), config.DASHBOARD_SETTINGS_PASSWORD):
+            ip = request.remote_addr or "unknown"
+            if _login_rate_limited(ip):
+                login_error = "Too many attempts. Try again in a few minutes."
+            elif secrets.compare_digest(request.form.get("password", ""), config.DASHBOARD_SETTINGS_PASSWORD):
+                _clear_login_failures(ip)
                 resp = redirect(url_for("settings"))
-                resp.set_cookie(_AUTH_COOKIE, _make_auth_cookie_value(), samesite="Strict", httponly=True)
+                resp.set_cookie(_AUTH_COOKIE, _make_auth_cookie_value(), samesite="Strict", httponly=True, secure=request.is_secure)
                 return resp
-            login_error = "Incorrect password."
+            else:
+                _record_login_failure(ip)
+                login_error = "Incorrect password."
         return render_template("settings_login.html", error=login_error)
 
     error = None
