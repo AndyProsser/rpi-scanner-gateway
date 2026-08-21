@@ -64,6 +64,9 @@ class Config:
     # --- Dashboard ---
     DASHBOARD_HOST = os.getenv("DASHBOARD_HOST", "0.0.0.0")
     DASHBOARD_PORT = _int("DASHBOARD_PORT", 5000)
+    # Optional HTTP Basic Auth password gating /settings only (the rest of the
+    # dashboard stays open — see docs/SETUP.md). Empty/unset = no auth.
+    DASHBOARD_SETTINGS_PASSWORD = os.getenv("DASHBOARD_SETTINGS_PASSWORD", "")
 
     @classmethod
     def ensure_dirs(cls):

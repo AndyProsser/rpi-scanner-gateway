@@ -8,16 +8,21 @@ Tiny monitoring dashboard.
   /scans/<job_id>/download  same file, as an attachment
   /scans/<job_id>/delete    POST — deletes the local archive copy permanently
   /settings  view/change the recipient email (stored in the DB, overrides
-             RECIPIENT_EMAIL from .env without a restart)
+             RECIPIENT_EMAIL from .env without a restart) -- gated by a
+             password login form if DASHBOARD_SETTINGS_PASSWORD is set;
+             open like everything else otherwise
 
-No login — this is only as safe as the network it's reachable on (Tailscale
-and/or LAN, see docs/SETUP.md). Don't expose it to the open internet. The
-POST routes (settings, delete) still carry a double-submit-cookie CSRF
-check so a malicious page in another tab can't drive them just because
-your browser can reach the dashboard.
+No login on any other route — this is only as safe as the network it's
+reachable on (Tailscale and/or LAN, see docs/SETUP.md). Don't expose it to
+the open internet. Every POST route (settings, delete) carries a
+double-submit-cookie CSRF check so a malicious page in another tab can't
+drive them just because your browser can reach the dashboard.
 """
+import hashlib
+import hmac
 import re
 import secrets
+import time
 from flask import Flask, render_template, send_file, abort, request, redirect, url_for, g
 from pathlib import Path
 
@@ -28,6 +33,8 @@ app = Flask(__name__)
 
 _EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 _CSRF_COOKIE = "csrf_token"
+_AUTH_COOKIE = "settings_auth"
+_AUTH_TTL_SECONDS = 24 * 3600
 
 
 @app.before_request
@@ -52,6 +59,32 @@ def _require_csrf():
     form_token = request.form.get("csrf_token", "")
     if not cookie_token or not secrets.compare_digest(cookie_token, form_token):
         abort(403)
+
+
+def _sign_auth_timestamp(timestamp: str) -> str:
+    # Keyed by the configured password itself -- no separate SECRET_KEY needed,
+    # and changing the password automatically invalidates every existing
+    # signed-in cookie.
+    return hmac.new(config.DASHBOARD_SETTINGS_PASSWORD.encode(), timestamp.encode(), hashlib.sha256).hexdigest()
+
+
+def _make_auth_cookie_value() -> str:
+    ts = str(int(time.time()))
+    return f"{ts}.{_sign_auth_timestamp(ts)}"
+
+
+def _settings_auth_ok() -> bool:
+    """No DASHBOARD_SETTINGS_PASSWORD configured means /settings stays open,
+    same as every other route."""
+    if not config.DASHBOARD_SETTINGS_PASSWORD:
+        return True
+    ts, _, sig = request.cookies.get(_AUTH_COOKIE, "").partition(".")
+    if not ts or not sig or not secrets.compare_digest(sig, _sign_auth_timestamp(ts)):
+        return False
+    try:
+        return time.time() - int(ts) < _AUTH_TTL_SECONDS
+    except ValueError:
+        return False
 
 STATUS_LABELS = {
     "received": ("Received", "neutral"),
@@ -151,6 +184,17 @@ def delete_scan(job_id):
 
 @app.route("/settings", methods=["GET", "POST"])
 def settings():
+    if not _settings_auth_ok():
+        login_error = None
+        if request.method == "POST":
+            _require_csrf()
+            if secrets.compare_digest(request.form.get("password", ""), config.DASHBOARD_SETTINGS_PASSWORD):
+                resp = redirect(url_for("settings"))
+                resp.set_cookie(_AUTH_COOKIE, _make_auth_cookie_value(), samesite="Strict", httponly=True)
+                return resp
+            login_error = "Incorrect password."
+        return render_template("settings_login.html", error=login_error)
+
     error = None
     saved = False
     if request.method == "POST":

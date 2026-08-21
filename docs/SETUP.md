@@ -207,6 +207,11 @@ sudo journalctl -u scan-watcher -f     # tail logs live while testing
 
 ## Ongoing maintenance
 
+- Dashboard access: the whole dashboard is unauthenticated by default — it's
+  only as safe as the network it's reachable on (Tailscale/LAN). If you want
+  a password on just the `/settings` page (where the recipient email is
+  changed), set `DASHBOARD_SETTINGS_PASSWORD` in `.env` and restart
+  `scan-dashboard.service`. Everything else stays open either way.
 - Logs: `journalctl -u scan-watcher` / `-u scan-dashboard`
 - If a scan fails, it's visible on `/details` with the error message, and
   the original is preserved in `/srv/scans/failed` for reprocessing.
