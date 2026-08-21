@@ -63,6 +63,7 @@
                 <a href="/scans/{{ job.id }}/view" target="_blank">View</a> ·
                 <a href="/scans/{{ job.id }}/download">Download</a> ·
                 <form class="inline-form" method="post" action="/scans/{{ job.id }}/delete" onsubmit="return confirm('Delete this scan permanently? This cannot be undone.');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     <button type="submit" class="link-button">Delete</button>
                 </form>
                 {% endif %}

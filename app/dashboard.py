@@ -10,17 +10,48 @@ Tiny monitoring dashboard.
   /settings  view/change the recipient email (stored in the DB, overrides
              RECIPIENT_EMAIL from .env without a restart)
 
-No authentication — this is only as safe as the network it's reachable on
-(Tailscale and/or LAN, see docs/SETUP.md). Don't expose it to the open
-internet.
+No login — this is only as safe as the network it's reachable on (Tailscale
+and/or LAN, see docs/SETUP.md). Don't expose it to the open internet. The
+POST routes (settings, delete) still carry a double-submit-cookie CSRF
+check so a malicious page in another tab can't drive them just because
+your browser can reach the dashboard.
 """
-from flask import Flask, render_template, send_file, abort, request, redirect, url_for
+import re
+import secrets
+from flask import Flask, render_template, send_file, abort, request, redirect, url_for, g
 from pathlib import Path
 
 from app.config import config
 from app import db
 
 app = Flask(__name__)
+
+_EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
+_CSRF_COOKIE = "csrf_token"
+
+
+@app.before_request
+def _load_csrf_token():
+    g.csrf_token = request.cookies.get(_CSRF_COOKIE) or secrets.token_urlsafe(32)
+
+
+@app.after_request
+def _persist_csrf_cookie(response):
+    if request.cookies.get(_CSRF_COOKIE) != g.get("csrf_token"):
+        response.set_cookie(_CSRF_COOKIE, g.csrf_token, samesite="Strict", httponly=True)
+    return response
+
+
+@app.context_processor
+def _inject_csrf_token():
+    return {"csrf_token": g.get("csrf_token", "")}
+
+
+def _require_csrf():
+    cookie_token = request.cookies.get(_CSRF_COOKIE, "")
+    form_token = request.form.get("csrf_token", "")
+    if not cookie_token or not secrets.compare_digest(cookie_token, form_token):
+        abort(403)
 
 STATUS_LABELS = {
     "received": ("Received", "neutral"),
@@ -108,6 +139,7 @@ def download_scan(job_id):
 
 @app.route("/scans/<int:job_id>/delete", methods=["POST"])
 def delete_scan(job_id):
+    _require_csrf()
     job = db.get_job(job_id)
     if job and job["archive_path"]:
         path = Path(job["archive_path"])
@@ -122,8 +154,9 @@ def settings():
     error = None
     saved = False
     if request.method == "POST":
+        _require_csrf()
         new_email = request.form.get("recipient_email", "").strip()
-        if new_email and "@" in new_email:
+        if new_email and _EMAIL_RE.match(new_email):
             db.set_setting("recipient_email", new_email)
             saved = True
         else:

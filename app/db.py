@@ -61,9 +61,19 @@ def create_job(filename: str) -> int:
         return cur.lastrowid
 
 
+_JOB_COLUMNS = {
+    "filename", "status", "created_at", "updated_at", "page_count",
+    "blank_pages_removed", "original_size_bytes", "compressed_size_bytes",
+    "thumbnail_path", "archive_path", "onedrive_link", "email_sent", "error_message",
+}
+
+
 def update_job(job_id: int, **fields):
     if not fields:
         return
+    unknown = set(fields) - _JOB_COLUMNS
+    if unknown:
+        raise ValueError(f"update_job() got unknown column(s): {sorted(unknown)}")
     fields["updated_at"] = time.time()
     cols = ", ".join(f"{k} = ?" for k in fields)
     values = list(fields.values()) + [job_id]

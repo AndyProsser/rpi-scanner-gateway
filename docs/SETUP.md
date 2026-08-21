@@ -85,12 +85,12 @@ Pick one and set `EMAIL_PROVIDER` accordingly in `.env`.
 Works for cPanel-hosted email, Gmail, Microsoft Live (personal), and Apple
 iCloud Mail — same protocol, different host/port/credentials:
 
-| Provider | SMTP_HOST | SMTP_PORT | SMTP_USERNAME |
-|---|---|---|---|
-| cPanel | usually `mail.yourdomain.com`, or check your host's docs/cPanel's "Email Accounts" page | `587` (STARTTLS) or `465` (SSL) — cPanel shows both | full email address |
-| Gmail | `smtp.gmail.com` | `587` | full email address (needs an [app password](https://myaccount.google.com/apppasswords), not your regular password) |
-| Microsoft Live (personal, not M365 tenant) | `smtp.office365.com` or `smtp-mail.outlook.com` — check your account type | `587` | full email address |
-| Apple iCloud Mail | `smtp.mail.me.com` | `587` | full iCloud email + an [app-specific password](https://support.apple.com/en-us/102654) |
+| Provider                                   | SMTP_HOST                                                                               | SMTP_PORT                                           | SMTP_USERNAME                                                                                                      |
+| ------------------------------------------ | --------------------------------------------------------------------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| cPanel                                     | usually `mail.yourdomain.com`, or check your host's docs/cPanel's "Email Accounts" page | `587` (STARTTLS) or `465` (SSL) — cPanel shows both | full email address                                                                                                 |
+| Gmail                                      | `smtp.gmail.com`                                                                        | `587`                                               | full email address (needs an [app password](https://myaccount.google.com/apppasswords), not your regular password) |
+| Microsoft Live (personal, not M365 tenant) | `smtp.office365.com` or `smtp-mail.outlook.com` — check your account type               | `587`                                               | full email address                                                                                                 |
+| Apple iCloud Mail                          | `smtp.mail.me.com`                                                                      | `587`                                               | full iCloud email + an [app-specific password](https://support.apple.com/en-us/102654)                             |
 
 `SMTP_FROM_ADDRESS` is usually the same as `SMTP_USERNAME`. `RECIPIENT_EMAIL`
 is whoever should get the "scan ready" notification.
@@ -125,7 +125,7 @@ openssl x509 -in graph-app.crt -noout -fingerprint -sha1
 
 ### Lock down Mail.Send (important, Option B only)
 
-App-only `Mail.Send` without scoping lets this app send as *any* mailbox in
+App-only `Mail.Send` without scoping lets this app send as _any_ mailbox in
 the tenant. Restrict it to just the sending mailbox via Exchange Online
 PowerShell:
 
@@ -188,6 +188,7 @@ sudo cp avahi/scanner-gateway.service /etc/avahi/services/
 `avahi-daemon` picks up new service files automatically; no restart needed.
 
 Check it's alive:
+
 ```bash
 sudo systemctl status scan-watcher
 sudo journalctl -u scan-watcher -f     # tail logs live while testing

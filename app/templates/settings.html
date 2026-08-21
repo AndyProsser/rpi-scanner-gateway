@@ -21,6 +21,7 @@
             {% endif %}
         </p>
         <form method="post">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <input type="email" id="recipient_email" name="recipient_email" value="{{ recipient_email }}" required>
             <button type="submit">Save</button>
         </form>
