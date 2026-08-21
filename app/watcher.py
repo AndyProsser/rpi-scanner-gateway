@@ -26,7 +26,8 @@ from app.config import config
 from app import db
 from app.blank_pages import strip_blank_pages
 from app.ocr import run_ocr, make_thumbnail, OcrError
-from app.graph import upload_to_onedrive, send_email, GraphError
+from app.graph import upload_to_onedrive, GraphError
+from app.email import get_email_sender, EmailError
 
 logging.basicConfig(
     level=logging.INFO,
@@ -115,11 +116,11 @@ def process_file(src_path: Path):
         <p>A copy has also been saved to your OneDrive:<br>
         <a href="{onedrive_link}">{onedrive_link}</a></p>
         """
-        send_email(subject=f"Scanned: {filename}", body_html=body, attachment_path=str(ocr_output_path))
+        get_email_sender().send(subject=f"Scanned: {filename}", body_html=body, attachment_path=str(ocr_output_path))
         db.update_job(job_id, email_sent=1, status="done")
         logger.info("Job %s complete: %s", job_id, filename)
 
-    except (OcrError, GraphError) as e:
+    except (OcrError, GraphError, EmailError) as e:
         logger.error("Job %s failed: %s", job_id, e)
         _fail_job(job_id, work_dir, filename, str(e))
     except Exception as e:
