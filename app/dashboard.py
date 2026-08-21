@@ -4,10 +4,17 @@ Tiny monitoring dashboard.
   /          simple view — big status of the most recent scan (for the recipient)
   /details   full job history with sizes, errors, thumbnails (for you)
   /thumb/<job_id>  serves the page-1 thumbnail image
+  /scans/<job_id>/view      serves the archived PDF inline (browser viewer)
+  /scans/<job_id>/download  same file, as an attachment
+  /scans/<job_id>/delete    POST — deletes the local archive copy permanently
+  /settings  view/change the recipient email (stored in the DB, overrides
+             RECIPIENT_EMAIL from .env without a restart)
 
-Runs on the Pi, reachable only over Tailscale (see docs/SETUP.md).
+No authentication — this is only as safe as the network it's reachable on
+(Tailscale and/or LAN, see docs/SETUP.md). Don't expose it to the open
+internet.
 """
-from flask import Flask, render_template, send_file, abort
+from flask import Flask, render_template, send_file, abort, request, redirect, url_for
 from pathlib import Path
 
 from app.config import config
@@ -76,6 +83,59 @@ def thumb(job_id):
     if not path.exists():
         abort(404)
     return send_file(path, mimetype="image/png")
+
+
+def _archived_pdf_path(job_id: int) -> Path:
+    job = db.get_job(job_id)
+    if not job or not job["archive_path"]:
+        abort(404)
+    path = Path(job["archive_path"])
+    if not path.exists():
+        abort(404)
+    return path
+
+
+@app.route("/scans/<int:job_id>/view")
+def view_scan(job_id):
+    return send_file(_archived_pdf_path(job_id), mimetype="application/pdf")
+
+
+@app.route("/scans/<int:job_id>/download")
+def download_scan(job_id):
+    path = _archived_pdf_path(job_id)
+    return send_file(path, mimetype="application/pdf", as_attachment=True, download_name=path.name)
+
+
+@app.route("/scans/<int:job_id>/delete", methods=["POST"])
+def delete_scan(job_id):
+    job = db.get_job(job_id)
+    if job and job["archive_path"]:
+        path = Path(job["archive_path"])
+        if path.exists():
+            path.unlink()
+        db.update_job(job_id, archive_path=None)
+    return redirect(url_for("details"))
+
+
+@app.route("/settings", methods=["GET", "POST"])
+def settings():
+    error = None
+    saved = False
+    if request.method == "POST":
+        new_email = request.form.get("recipient_email", "").strip()
+        if new_email and "@" in new_email:
+            db.set_setting("recipient_email", new_email)
+            saved = True
+        else:
+            error = "Enter a valid email address."
+
+    return render_template(
+        "settings.html",
+        recipient_email=db.get_recipient_email(),
+        is_override=db.get_setting("recipient_email") is not None,
+        error=error,
+        saved=saved,
+    )
 
 
 def main():

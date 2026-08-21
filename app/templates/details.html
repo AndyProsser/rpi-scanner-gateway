@@ -10,7 +10,7 @@
 </head>
 <body>
 <div class="container">
-    <h1>📠 Scan Job History <a href="/" style="font-size:0.9rem; font-weight:normal;">← simple view</a></h1>
+    <h1>📠 Scan Job History <a class="nav-link" href="/">← simple view</a> <a class="nav-link" href="/settings">Settings</a></h1>
 
     {% if jobs %}
     <table>
@@ -23,6 +23,7 @@
             <th>Pages</th>
             <th>Size</th>
             <th>Links</th>
+            <th>Actions</th>
         </tr>
         </thead>
         <tbody>
@@ -56,6 +57,15 @@
             <td>
                 {% if job.onedrive_link %}<a href="{{ job.onedrive_link }}" target="_blank">OneDrive</a>{% endif %}
                 {% if job.email_sent %} &middot; Emailed{% endif %}
+            </td>
+            <td class="actions">
+                {% if job.archive_path %}
+                <a href="/scans/{{ job.id }}/view" target="_blank">View</a> ·
+                <a href="/scans/{{ job.id }}/download">Download</a> ·
+                <form class="inline-form" method="post" action="/scans/{{ job.id }}/delete" onsubmit="return confirm('Delete this scan permanently? This cannot be undone.');">
+                    <button type="submit" class="link-button">Delete</button>
+                </form>
+                {% endif %}
             </td>
         </tr>
         {% endfor %}
