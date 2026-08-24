@@ -11,6 +11,57 @@ Rust toolchain and qpdf headers), which is slow and often fails outright on
 a Pi 3B. The Pi 3B has a 64-bit-capable CPU, so this is just an OS image
 choice.
 
+Use Raspberry Pi Imager's **OS Customisation** (gear icon, or Ctrl+Shift+X,
+before you click Write) to set the hostname, enable SSH with your public
+key, create the login user, and configure Wi-Fi. This writes first-boot
+config so the Pi comes up headless-ready with no monitor/keyboard needed.
+
+**Verify it actually applied before you eject the card.** Raspberry Pi
+Imager (confirmed on 1.8.5) can silently fail to write your customisation
+into the image — it happened on this project's own first attempt with a
+Trixie-based image. Imager still *remembers* what you typed (visible in its
+own cache, `~/.config/Raspberry Pi/Imager.conf` on Linux) but the card
+itself keeps the stock, unconfigured first-boot files. With the card still
+mounted on your computer, check the boot partition:
+
+- Newer images (Trixie+) use cloud-init: open `user-data` on the boot
+  partition. If every line is commented out (`#hostname: raspberrypi`,
+  etc.), customisation did **not** apply — this is the default template
+  pi-gen ships, not your settings.
+- Older images use `custom.toml` / `firstrun.sh` instead. If neither of
+  those exists on the boot partition, same problem.
+
+If it didn't apply, don't bother re-running Imager and hoping — it's just
+as likely to no-op again. Either downgrade/upgrade Imager to a version
+known to work for the image you're flashing, or hand-edit `user-data` (and
+`network-config` for Wi-Fi) on the boot partition directly with the
+settings you meant to apply — it's plain YAML, and cloud-init reads it on
+first boot without any extra work.
+
+**SSH still won't be reachable even with a correct `user-data`.** Raspberry
+Pi OS ships `openssh-server` pre-installed but the service **disabled by
+default**, and merely setting `ssh_authorized_keys`/`ssh_pwauth` on a user
+does not enable or start it — you'll boot, the Pi will join Wi-Fi/Ethernet
+fine, and `ssh piscan.local` will get **connection refused** (not a
+timeout — the host is up, nothing's listening on 22). Cover both of the
+independent mechanisms that can enable it, so you're not relying on one:
+
+1. In `user-data`, add a `runcmd` that flips it on explicitly:
+
+   ```yaml
+   runcmd:
+     - systemctl enable --now ssh
+   ```
+
+2. Belt-and-suspenders, and the only fix if you're patching a card *after*
+   first boot already ran (cloud-init only applies `user-data` once per
+   `instance_id` — editing it post-boot won't retrigger it): drop an empty
+   file named `ssh` at the root of the boot partition (`touch ssh` there).
+   This is Raspberry Pi OS's own override, unrelated to cloud-init — a
+   systemd unit checks for that file on **every** boot, and if present,
+   enables + starts `ssh` then deletes the marker. Works even on a card
+   that's already been provisioned.
+
 ```bash
 sudo apt update && sudo apt full-upgrade -y
 sudo apt install -y python3-venv python3-pip samba tesseract-ocr \
