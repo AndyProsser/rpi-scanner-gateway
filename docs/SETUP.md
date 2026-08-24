@@ -93,19 +93,33 @@ just re-run `locale-gen` to completion, it regenerates everything in
 ```bash
 sudo apt update && sudo apt full-upgrade -y
 sudo apt install -y python3-venv python3-pip samba tesseract-ocr \
-    ghostscript jbig2enc unpaper git avahi-daemon
+    ghostscript jbig2 unpaper pngquant git avahi-daemon fonts-noto
 ```
 
-`jbig2enc` isn't always packaged for ARM on Raspberry Pi OS — if `apt install jbig2enc`
-fails, ocrmypdf will silently skip `--jbig2-lossy` and fall back to standard
-compression. Not a blocker, just slightly bigger files.
+**`jbig2`, `unpaper`, `pngquant`, and `ghostscript` are all hard
+requirements**, not optional extras — `app/ocr.py` runs ocrmypdf with
+`--jbig2-lossy --clean --optimize 3`, and each flag shells out to one of
+these; missing any one fails every OCR job outright with `exit 3`, it does
+not degrade quietly. Confirmed by checking what `ocrmypdf`'s own
+`_exec/` package actually wraps (`ghostscript.py`, `jbig2enc.py`,
+`pngquant.py`, `tesseract.py`, `unpaper.py`) rather than guessing — that's
+the complete external-binary surface for this project's flag set. `qpdf`
+is *not* needed despite `pikepdf` using it internally: pikepdf bundles its
+own vendored `libqpdf` rather than linking or shelling out to a system
+install.
 
-`unpaper` is what ocrmypdf's `--clean`/`--clean-final` flags (both used
-here — see `app/ocr.py`) shell out to; skip it and OCR jobs fail outright
-with `exit 3`, not just degrade like the `jbig2enc` case above. On Trixie
-it pulls in a surprisingly large dependency chain (~90 packages, mostly
-multimedia libs unpaper links against) — give the install a few minutes on
-a Pi 3B rather than assuming it's hung.
+Package name note: on older Raspberry Pi OS (Bookworm and earlier) this
+encoder was packaged as `jbig2enc`; on Trixie it was renamed to plain
+`jbig2` (the CLI binary itself has always been called `jbig2` either way —
+`jbig2enc` was only ever the package name, and apt won't fuzzy-match a
+renamed package for you, it just 404s). If `jbig2` 404s on whatever you're
+running, `apt-cache search jbig2` shows the actual current package name
+rather than guessing.
+
+`unpaper` pulls in a surprisingly large dependency chain on Trixie (~90
+packages, mostly multimedia libs it links against) — give the install a
+few minutes on a Pi 3B rather than assuming it's hung; `jbig2` and
+`pngquant` are tiny by contrast.
 
 ## 2. Create the service user and directories
 

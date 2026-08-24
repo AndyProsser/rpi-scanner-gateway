@@ -93,6 +93,18 @@ def list_jobs(limit: int = 50):
         ).fetchall()
 
 
+def list_failed_jobs():
+    with get_db() as conn:
+        return conn.execute(
+            "SELECT * FROM jobs WHERE status = 'failed' ORDER BY created_at DESC"
+        ).fetchall()
+
+
+def delete_job(job_id: int):
+    with get_db() as conn:
+        conn.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
+
+
 def get_latest_job():
     with get_db() as conn:
         return conn.execute(

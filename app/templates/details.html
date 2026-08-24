@@ -12,6 +12,13 @@
 <div class="container">
     <h1>📠 Scan Job History <a class="nav-link" href="/">← simple view</a> <a class="nav-link" href="/settings">Settings</a></h1>
 
+    {% if failed_count %}
+    <form class="inline-form" method="post" action="/jobs/clean-failed" onsubmit="return confirm('Delete {{ failed_count }} failed job(s) and their preserved originals? This cannot be undone.');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button type="submit" class="link-button">Clean Failed ({{ failed_count }})</button>
+    </form>
+    {% endif %}
+
     {% if jobs %}
     <table>
         <thead>

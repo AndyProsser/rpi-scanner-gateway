@@ -7,6 +7,8 @@ Tiny monitoring dashboard.
   /scans/<job_id>/view      serves the archived PDF inline (browser viewer)
   /scans/<job_id>/download  same file, as an attachment
   /scans/<job_id>/delete    POST — deletes the local archive copy permanently
+  /jobs/clean-failed        POST — deletes all failed jobs (row + preserved
+             original in /srv/scans/failed), permanently
   /settings  view/change the recipient email (stored in the DB, overrides
              RECIPIENT_EMAIL from .env without a restart) -- gated by a
              password login form if DASHBOARD_SETTINGS_PASSWORD is set;
@@ -159,7 +161,8 @@ def index():
 @app.route("/details")
 def details():
     jobs = [_enrich(j) for j in db.list_jobs(limit=100)]
-    return render_template("details.html", jobs=jobs)
+    failed_count = len(db.list_failed_jobs())
+    return render_template("details.html", jobs=jobs, failed_count=failed_count)
 
 
 @app.route("/thumb/<int:job_id>")
@@ -203,6 +206,19 @@ def delete_scan(job_id):
         if path.exists():
             path.unlink()
         db.update_job(job_id, archive_path=None)
+    return redirect(url_for("details"))
+
+
+@app.route("/jobs/clean-failed", methods=["POST"])
+def clean_failed_jobs():
+    _require_csrf()
+    for job in db.list_failed_jobs():
+        # Preserved by watcher._fail_job() for reprocessing — same naming
+        # convention, so it's derivable without a dedicated DB column.
+        failed_path = config.SCAN_FAILED / f"job_{job['id']}_{job['filename']}"
+        if failed_path.exists():
+            failed_path.unlink()
+        db.delete_job(job["id"])
     return redirect(url_for("details"))
 
 
