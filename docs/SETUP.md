@@ -93,12 +93,19 @@ just re-run `locale-gen` to completion, it regenerates everything in
 ```bash
 sudo apt update && sudo apt full-upgrade -y
 sudo apt install -y python3-venv python3-pip samba tesseract-ocr \
-    ghostscript jbig2enc git avahi-daemon
+    ghostscript jbig2enc unpaper git avahi-daemon
 ```
 
 `jbig2enc` isn't always packaged for ARM on Raspberry Pi OS — if `apt install jbig2enc`
 fails, ocrmypdf will silently skip `--jbig2-lossy` and fall back to standard
 compression. Not a blocker, just slightly bigger files.
+
+`unpaper` is what ocrmypdf's `--clean`/`--clean-final` flags (both used
+here — see `app/ocr.py`) shell out to; skip it and OCR jobs fail outright
+with `exit 3`, not just degrade like the `jbig2enc` case above. On Trixie
+it pulls in a surprisingly large dependency chain (~90 packages, mostly
+multimedia libs unpaper links against) — give the install a few minutes on
+a Pi 3B rather than assuming it's hung.
 
 ## 2. Create the service user and directories
 
