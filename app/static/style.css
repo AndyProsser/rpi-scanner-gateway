@@ -122,7 +122,8 @@ a { color: var(--link); }
 .email-summary { text-align: center; color: var(--muted); font-size: 0.85rem; margin-top: 1rem; display: flex; align-items: center; justify-content: center; gap: 0.35rem; }
 
 /* --- Simple view --- */
-.big-status { background: var(--card-bg); border-radius: 16px; padding: 2.5rem 2rem; text-align: center; box-shadow: 0 1px 3px var(--shadow); }
+.big-status { position: relative; background: var(--card-bg); border-radius: 16px; padding: 2.5rem 2rem; text-align: center; box-shadow: 0 1px 3px var(--shadow); }
+.big-status-delete { position: absolute; top: 0.75rem; right: 0.75rem; }
 .big-status .status-icon { margin-bottom: 0.5rem; }
 .big-status .status-icon.good { color: var(--good-fg); }
 .big-status .status-icon.bad { color: var(--bad-fg); }
@@ -157,9 +158,23 @@ tr:last-child td { border-bottom: none; }
 .savings { color: var(--good-fg); font-size: 0.8rem; }
 
 /* --- Actions column (details view) --- */
-.actions { white-space: nowrap; font-size: 0.85rem; }
-.actions a, .actions .link-button { display: inline-flex; align-items: center; gap: 0.25rem; }
+.actions { white-space: nowrap; display: flex; gap: 0.3rem; align-items: center; }
 .inline-form { display: inline; }
+.icon-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    color: var(--muted);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+}
+.icon-action:hover { background: var(--th-bg); color: var(--fg); }
+.icon-action.danger:hover { background: var(--bad-bg); color: var(--bad-fg); }
 .link-button {
     background: none;
     border: none;

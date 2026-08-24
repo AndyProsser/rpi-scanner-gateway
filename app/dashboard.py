@@ -246,6 +246,8 @@ def delete_scan(job_id):
         if path.exists():
             path.unlink()
         db.update_job(job_id, archive_path=None)
+    if request.form.get("redirect_to") == "home":
+        return redirect(url_for("index"))
     return redirect(url_for("details"))
 
 

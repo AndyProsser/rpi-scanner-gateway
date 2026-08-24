@@ -46,6 +46,13 @@
 
 {% if job %}
 <div class="big-status {{ job.status_class }}">
+    {% if job.archive_path %}
+    <form class="inline-form big-status-delete" method="post" action="/scans/{{ job.id }}/delete" onsubmit="return confirm('Delete this scan permanently? This cannot be undone.');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="redirect_to" value="home">
+        <button type="submit" class="icon-action danger" title="Delete" aria-label="Delete">{{ icon('trash', 18) }}</button>
+    </form>
+    {% endif %}
     {% if job.thumbnail_path %}
     <a href="/scans/{{ job.id }}/view" target="_blank">
         <img class="preview" src="/thumb/{{ job.id }}" alt="Preview of {{ job.filename }}">
