@@ -62,6 +62,34 @@ independent mechanisms that can enable it, so you're not relying on one:
    enables + starts `ssh` then deletes the marker. Works even on a card
    that's already been provisioned.
 
+**Set the locale explicitly too** — pi-gen bakes in `en_GB.UTF-8` as the
+default and only that locale is generated on the image (`locale -a` won't
+even list others, e.g. `en_AU.UTF-8`, until they're generated). Neither
+`keyboard:` nor `timezone:` in `user-data` touches this — you need the
+dedicated `locale:` key, which handles generation and `update-locale`
+together on first boot:
+
+```yaml
+locale: en_AU.UTF-8
+```
+
+If you're fixing an already-provisioned Pi instead (same one-shot
+`instance_id` caveat as above — editing `user-data` won't retrigger it),
+do it live over SSH:
+
+```bash
+sudo sed -i 's/^# en_AU.UTF-8 UTF-8/en_AU.UTF-8 UTF-8/' /etc/locale.gen
+sudo locale-gen
+sudo update-locale LANG=en_AU.UTF-8
+```
+
+`locale-gen` genuinely takes a while on a Pi 3B (a minute or more for a
+couple of locales) — give it a generous timeout rather than killing it
+early. Killing it mid-run leaves `locale -a` missing locales that were
+previously generated, including the pre-existing default; if that happens,
+just re-run `locale-gen` to completion, it regenerates everything in
+`/etc/locale.gen` and repairs itself.
+
 ```bash
 sudo apt update && sudo apt full-upgrade -y
 sudo apt install -y python3-venv python3-pip samba tesseract-ocr \
