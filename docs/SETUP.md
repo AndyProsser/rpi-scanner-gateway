@@ -357,3 +357,43 @@ sudo journalctl -u scan-watcher -f     # tail logs live while testing
   the original is preserved in `/srv/scans/failed` for reprocessing.
 - Client secret expiry: Entra secrets typically max out at 24 months —
   put a reminder in your calendar.
+
+### System maintenance from the dashboard (Settings > Maintenance)
+
+Lets you run `apt-get update`/`upgrade` and reboot the Pi from the
+dashboard, instead of SSHing in. **Requires `DASHBOARD_SETTINGS_PASSWORD`
+to be set at all** — unlike the rest of the dashboard, this section stays
+disabled with no password configured, since it runs real privileged
+commands rather than just changing a stored setting.
+
+One-time setup, since `scanpipeline` (the account the dashboard runs as)
+needs a narrow sudo grant to run these three specific commands as root:
+
+```bash
+sudo cp scripts/scanpipeline-maintenance.sudoers /etc/sudoers.d/scanpipeline-maintenance
+sudo chmod 440 /etc/sudoers.d/scanpipeline-maintenance
+sudo visudo -c
+```
+
+`visudo -c` should end with `/etc/sudoers.d/scanpipeline-maintenance: parsed
+OK`. Ignore a "syntax error" line pointing at the upgrade rule if a `parsed
+OK` for that same file follows it — that's `visudo -c`'s own preliminary
+pass, not the final result; `sudo -u scanpipeline sudo -n -l` is the
+authoritative check and should list all three commands.
+
+If you're updating an existing deployment rather than following this guide
+fresh, re-copy `systemd/scan-dashboard.service` and `daemon-reload` +
+`restart` it — this feature needed two changes to the unit that are easy to
+half-apply by hand: `NoNewPrivileges` had to come out entirely (it blocks
+`sudo` outright), and `CapabilityBoundingSet` (added for the port-80 trick
+above) had to come out too, *not* just be widened — capping the bounding
+set to `CAP_NET_BIND_SERVICE` blocks `sudo` from ever acquiring
+`CAP_SETUID`/`CAP_SETGID` even via its setuid bit, which surfaces as `sudo:
+unable to change to root gid: Operation not permitted` if you hit it.
+`AmbientCapabilities=CAP_NET_BIND_SERVICE` alone is enough for the port-80
+binding and doesn't conflict with sudo.
+
+Patch runs in the background (can take several minutes on a Pi 3B) — the
+page shows "an update is currently running" until it's done, and the last
+run's output stays visible in a collapsible panel either way. Reboot
+interrupts any scan in progress, same as pulling the power.

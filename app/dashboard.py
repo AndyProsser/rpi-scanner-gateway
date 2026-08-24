@@ -12,7 +12,14 @@ Tiny monitoring dashboard.
   /settings  view/change the recipient email (stored in the DB, overrides
              RECIPIENT_EMAIL from .env without a restart) -- gated by a
              password login form if DASHBOARD_SETTINGS_PASSWORD is set;
-             open like everything else otherwise
+             open like everything else otherwise. Also has a Maintenance
+             section (apt update/upgrade, reboot) that's gated separately --
+             it stays disabled even with no password set, unlike the rest of
+             this route (see _maintenance_enabled()). Needs
+             scripts/scanpipeline-maintenance.sudoers installed to work.
+  /settings/maintenance/check    POST — apt-get update, backgrounded
+  /settings/maintenance/patch    POST — apt-get upgrade, backgrounded
+  /settings/maintenance/reboot   POST — reboots the Pi
   /help      status meanings, troubleshooting, current config reference
 
 No login on any other route — this is only as safe as the network it's
@@ -24,8 +31,11 @@ drive them just because your browser can reach the dashboard.
 import datetime
 import hashlib
 import hmac
+import os
 import re
 import secrets
+import shlex
+import subprocess
 import time
 from collections import defaultdict
 from flask import Flask, render_template, send_file, abort, request, redirect, url_for, g
@@ -34,6 +44,9 @@ from pathlib import Path
 from app.config import config
 from app import db
 from app import system_stats
+
+MAINTENANCE_LOG = config.DB_PATH.parent / "maintenance.log"
+MAINTENANCE_PID = config.DB_PATH.parent / "maintenance.pid"
 
 app = Flask(__name__)
 
@@ -114,6 +127,44 @@ def _settings_auth_ok() -> bool:
         return time.time() - int(ts) < _AUTH_TTL_SECONDS
     except ValueError:
         return False
+
+
+def _maintenance_enabled() -> bool:
+    """Maintenance runs real privileged commands (apt upgrade, reboot) — unlike
+    the rest of the dashboard, which stays open by default when no password is
+    set, this requires DASHBOARD_SETTINGS_PASSWORD to exist at all, not just
+    a correct login. Reaching this being True also implies _settings_auth_ok()
+    already passed, since settings() returns the login form first otherwise."""
+    return bool(config.DASHBOARD_SETTINGS_PASSWORD)
+
+
+def _maintenance_running() -> bool:
+    return MAINTENANCE_PID.exists()
+
+
+def _maintenance_status() -> dict:
+    log_tail = ""
+    if MAINTENANCE_LOG.exists():
+        log_tail = "\n".join(MAINTENANCE_LOG.read_text(errors="replace").splitlines()[-60:])
+    return {"running": _maintenance_running(), "log_tail": log_tail}
+
+
+def _run_maintenance(label: str, cmd: list[str]):
+    """Fires a privileged command in the background via sudo and returns
+    immediately — apt upgrade can take minutes on a Pi 3B, so this must never
+    block the request. Output is logged and the pid lock cleared by the
+    wrapper shell itself once the command finishes, not by this process."""
+    MAINTENANCE_LOG.parent.mkdir(parents=True, exist_ok=True)
+    log_q, pid_q = shlex.quote(str(MAINTENANCE_LOG)), shlex.quote(str(MAINTENANCE_PID))
+    wrapper = (
+        f"echo '=== {label} '$(date)' ===' >> {log_q}; "
+        f"{' '.join(shlex.quote(part) for part in cmd)} >> {log_q} 2>&1; "
+        f'echo "=== DONE (exit $?) ===" >> {log_q}; '
+        f"rm -f {pid_q}"
+    )
+    proc = subprocess.Popen(["/bin/sh", "-c", wrapper], env={**os.environ, "DEBIAN_FRONTEND": "noninteractive"})
+    MAINTENANCE_PID.write_text(str(proc.pid))
+
 
 STATUS_LABELS = {
     "received": ("Received", "neutral"),
@@ -301,7 +352,38 @@ def settings():
         error=error,
         saved=saved,
         active_page="settings",
+        maintenance_enabled=_maintenance_enabled(),
+        maintenance=_maintenance_status(),
     )
+
+
+@app.route("/settings/maintenance/check", methods=["POST"])
+def maintenance_check():
+    _require_csrf()
+    if _maintenance_enabled() and _settings_auth_ok() and not _maintenance_running():
+        _run_maintenance("CHECK", ["sudo", "-n", "/usr/bin/apt-get", "update"])
+    return redirect(url_for("settings"))
+
+
+@app.route("/settings/maintenance/patch", methods=["POST"])
+def maintenance_patch():
+    _require_csrf()
+    if _maintenance_enabled() and _settings_auth_ok() and not _maintenance_running():
+        _run_maintenance("PATCH", [
+            "sudo", "-n", "/usr/bin/apt-get", "-y",
+            "-o", "Dpkg::Options::=--force-confdef",
+            "-o", "Dpkg::Options::=--force-confold",
+            "upgrade",
+        ])
+    return redirect(url_for("settings"))
+
+
+@app.route("/settings/maintenance/reboot", methods=["POST"])
+def maintenance_reboot():
+    _require_csrf()
+    if _maintenance_enabled() and _settings_auth_ok() and not _maintenance_running():
+        subprocess.Popen(["sudo", "-n", "/usr/sbin/reboot"])
+    return redirect(url_for("settings"))
 
 
 def main():
