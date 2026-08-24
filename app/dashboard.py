@@ -114,7 +114,7 @@ STATUS_LABELS = {
     "received": ("Received", "neutral"),
     "ocr_running": ("Processing…", "working"),
     "uploading": ("Uploading…", "working"),
-    "done": ("Sent \u2705", "good"),
+    "done": ("Ready \u2705", "good"),
     "failed": ("Failed \u274c", "bad"),
 }
 

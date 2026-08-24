@@ -1,8 +1,10 @@
 # RPi MFP Scanning Pipeline
 
 Printer MFP → SMB scan-to-folder on a Raspberry Pi 3B → strip blank pages →
-OCR + compress → local 30-day backup → OneDrive upload → email notification.
-Plus a tiny dashboard to monitor it, reachable over Tailscale.
+OCR + compress → local 30-day backup → OneDrive upload (optional) → email
+notification (optional). Plus a dashboard to view, download, and manage
+scans, reachable over Tailscale — the only required step if you skip both
+optional ones.
 
 ## Structure
 

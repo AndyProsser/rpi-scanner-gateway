@@ -32,7 +32,7 @@ class Config:
     BLANK_PAGE_THRESHOLD = float(os.getenv("BLANK_PAGE_THRESHOLD", "0.995"))  # % white pixels
 
     # --- Email sending ---
-    EMAIL_PROVIDER = os.getenv("EMAIL_PROVIDER", "smtp")  # smtp | graph
+    EMAIL_PROVIDER = os.getenv("EMAIL_PROVIDER", "smtp")  # smtp | graph | none
     RECIPIENT_EMAIL = os.getenv("RECIPIENT_EMAIL", "")  # who receives the scan notification
 
     # SMTP (Gmail / Microsoft Live / Apple iCloud / cPanel / any standard SMTP account)
@@ -53,7 +53,10 @@ class Config:
     GRAPH_CERT_THUMBPRINT = os.getenv("GRAPH_CERT_THUMBPRINT", "")
     SEND_FROM_MAILBOX = os.getenv("SEND_FROM_MAILBOX", "")  # UPN of the mailbox sending Graph email
 
-    # --- OneDrive ---
+    # --- Cloud storage ---
+    STORAGE_PROVIDER = os.getenv("STORAGE_PROVIDER", "onedrive")  # onedrive | none
+
+    # --- OneDrive (used when STORAGE_PROVIDER=onedrive) ---
     # ONEDRIVE_USER_EMAIL is the OneDrive upload target for upload_to_onedrive() in
     # app/graph.py (distinct from RECIPIENT_EMAIL above, which is who gets the email).
     # They may be the same address in a single-recipient deployment, but are kept

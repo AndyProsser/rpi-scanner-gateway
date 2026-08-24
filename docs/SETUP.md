@@ -124,7 +124,15 @@ sudo chown -R scanpipeline:scanpipeline /opt/scan-pipeline
 
 ## 4. Samba share (the Printer's scan target)
 
+`smb.conf` restricts the share to `valid users = scanner`, but that's a
+Samba-level restriction, not an account — `smbpasswd -a` only sets a Samba
+password for a user that **already exists** at the Unix level. Skipping
+this step fails with `Failed to add entry for user scanner.`, since there's
+no such system account (only `scanpipeline`, the separate service account
+from step 2, exists at that point):
+
 ```bash
+sudo useradd -r -M -s /usr/sbin/nologin scanner
 sudo tee -a /etc/samba/smb.conf < scripts/samba-scan-share.conf
 sudo smbpasswd -a scanner        # pick a password, note it down
 sudo systemctl restart smbd
@@ -155,9 +163,14 @@ On the MFP touchscreen (menu wording varies slightly by model):
    recognizable for whoever uses the printer — "Scan to Office" or similar.
 4. Test: scan a page, confirm it lands in `/srv/scans/inbox` on the Pi.
 
-## 6. Email provider setup
+## 6. Email provider setup (optional)
 
-Pick one and set `EMAIL_PROVIDER` accordingly in `.env`.
+Don't want notification emails at all? Set `EMAIL_PROVIDER=none` in `.env`
+and skip straight to [step 7](#7-tailscale) — recipients view, download,
+and delete processed scans directly from the dashboard's `/details` page
+instead. Nothing else in this section applies.
+
+Otherwise, pick one and set `EMAIL_PROVIDER` accordingly in `.env`.
 
 ### Option A — SMTP (`EMAIL_PROVIDER=smtp`)
 
@@ -220,9 +233,15 @@ Set `SEND_FROM_MAILBOX` to that same mailbox.
 
 ### OneDrive backup (optional, independent of the above)
 
-Still uses the client-secret Graph flow. If you want the local archive
-copy also mirrored to OneDrive, follow the app registration steps above
-but also add a client secret (**Certificates & secrets → New client
+Default is `STORAGE_PROVIDER=onedrive`. Set it to `STORAGE_PROVIDER=none`
+in `.env` for a fully local setup instead — no M365 tenant or app
+registration needed at all, whether or not you're using Graph for email.
+The 30-day local archive under `/srv/scans/archive` (browsable from the
+dashboard) is the only copy, and none of the vars below are required.
+
+To keep the OneDrive mirror (`STORAGE_PROVIDER=onedrive`, the default): it
+still uses the client-secret Graph flow. Follow the app registration steps
+above but also add a client secret (**Certificates & secrets → New client
 secret**) for `GRAPH_CLIENT_SECRET`, grant `Files.ReadWrite.All`, and set
 `ONEDRIVE_USER_EMAIL` to whose OneDrive receives the upload. This will move
 onto the same certificate as email sending in a future update.
@@ -278,10 +297,13 @@ sudo journalctl -u scan-watcher -f     # tail logs live while testing
 1. Scan a multi-page test document (include a deliberately blank page)
    from the Printer using the shortcut button.
 2. Watch `journalctl -u scan-watcher -f` — you should see it move through
-   received → OCR → uploading → done.
-3. Check the dashboard at `http://scanner-pi:5000`.
-4. Confirm the email arrived, the attachment opens and is searchable
-   (Cmd+F for a word you know is in the doc), and the OneDrive link works.
+   received → OCR → (uploading →, if `STORAGE_PROVIDER=onedrive`) → done.
+3. Check the dashboard at `http://scanner-pi:5000` — confirm the scan
+   shows up, opens (View), downloads correctly, and is searchable (Cmd+F
+   for a word you know is in the doc).
+4. If `EMAIL_PROVIDER` isn't `none`, confirm the email arrived and the
+   attachment opens/searches the same way. If `STORAGE_PROVIDER=onedrive`,
+   confirm the OneDrive link works.
 5. Check `/srv/scans/archive` has the local backup copy.
 
 ## Ongoing maintenance

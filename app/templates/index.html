@@ -28,7 +28,13 @@
             {% if job.compressed_size_fmt != '—' %} &middot; {{ job.compressed_size_fmt }}{% endif %}
         </div>
         {% if job.status == 'done' %}
-        <div class="meta">Emailed &amp; saved to OneDrive ✔</div>
+        <div class="meta">
+            {% if job.email_sent and job.onedrive_link %}Emailed &amp; saved to OneDrive ✔
+            {% elif job.email_sent %}Emailed ✔
+            {% elif job.onedrive_link %}Saved to OneDrive ✔
+            {% else %}Ready to view/download below ✔
+            {% endif %}
+        </div>
         {% elif job.status == 'failed' %}
         <div class="meta">Something went wrong — check /details for more information</div>
         {% endif %}

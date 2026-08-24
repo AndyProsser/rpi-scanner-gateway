@@ -101,23 +101,33 @@ def process_file(src_path: Path):
         shutil.copyfile(ocr_output_path, archive_path)
         db.update_job(job_id, archive_path=str(archive_path))
 
-        # --- Step 5: upload to OneDrive ---
-        db.update_job(job_id, status="uploading")
-        onedrive_link = upload_to_onedrive(str(ocr_output_path), filename)
-        db.update_job(job_id, onedrive_link=onedrive_link)
+        # --- Step 5: upload to OneDrive (optional, STORAGE_PROVIDER=none skips it) ---
+        onedrive_link = None
+        if config.STORAGE_PROVIDER == "onedrive":
+            db.update_job(job_id, status="uploading")
+            onedrive_link = upload_to_onedrive(str(ocr_output_path), filename)
+            db.update_job(job_id, onedrive_link=onedrive_link)
 
-        # --- Step 6: email the recipient ---
-        size_mb = compressed_size / (1024 * 1024)
-        body = f"""
-        <p>Hi,</p>
-        <p>Your scanned document <b>{filename}</b> is ready.</p>
-        <p>{kept} page(s) processed{f', {removed} blank page(s) removed' if removed else ''}.
-        File size: {size_mb:.1f} MB.</p>
-        <p>A copy has also been saved to your OneDrive:<br>
-        <a href="{onedrive_link}">{onedrive_link}</a></p>
-        """
-        get_email_sender().send(subject=f"Scanned: {filename}", body_html=body, attachment_path=str(ocr_output_path))
-        db.update_job(job_id, email_sent=1, status="done")
+        # --- Step 6: email the recipient (optional, EMAIL_PROVIDER=none skips it) ---
+        email_sender = get_email_sender()
+        if email_sender:
+            size_mb = compressed_size / (1024 * 1024)
+            storage_note = (
+                f'<p>A copy has also been saved to your OneDrive:<br>'
+                f'<a href="{onedrive_link}">{onedrive_link}</a></p>'
+                if onedrive_link else ""
+            )
+            body = f"""
+            <p>Hi,</p>
+            <p>Your scanned document <b>{filename}</b> is ready.</p>
+            <p>{kept} page(s) processed{f', {removed} blank page(s) removed' if removed else ''}.
+            File size: {size_mb:.1f} MB.</p>
+            {storage_note}
+            """
+            email_sender.send(subject=f"Scanned: {filename}", body_html=body, attachment_path=str(ocr_output_path))
+            db.update_job(job_id, email_sent=1)
+
+        db.update_job(job_id, status="done")
         logger.info("Job %s complete: %s", job_id, filename)
 
     except (OcrError, GraphError, EmailError) as e:
