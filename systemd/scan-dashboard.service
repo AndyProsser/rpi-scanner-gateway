@@ -15,5 +15,14 @@ RestartSec=10
 NoNewPrivileges=true
 PrivateTmp=true
 
+# Lets the dashboard bind port 80 directly (set DASHBOARD_PORT=80 in .env)
+# without running as root — compatible with NoNewPrivileges above, since
+# ambient capabilities are granted by systemd at process start rather than
+# via exec-time privilege escalation. CapabilityBoundingSet restricts the
+# process to only this one capability even if something else tried to grant
+# more later.
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+
 [Install]
 WantedBy=multi-user.target

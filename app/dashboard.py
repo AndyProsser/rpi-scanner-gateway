@@ -13,6 +13,7 @@ Tiny monitoring dashboard.
              RECIPIENT_EMAIL from .env without a restart) -- gated by a
              password login form if DASHBOARD_SETTINGS_PASSWORD is set;
              open like everything else otherwise
+  /help      status meanings, troubleshooting, current config reference
 
 No login on any other route — this is only as safe as the network it's
 reachable on (Tailscale and/or LAN, see docs/SETUP.md). Don't expose it to
@@ -20,6 +21,7 @@ the open internet. Every POST route (settings, delete) carries a
 double-submit-cookie CSRF check so a malicious page in another tab can't
 drive them just because your browser can reach the dashboard.
 """
+import datetime
 import hashlib
 import hmac
 import re
@@ -31,6 +33,7 @@ from pathlib import Path
 
 from app.config import config
 from app import db
+from app import system_stats
 
 app = Flask(__name__)
 
@@ -131,7 +134,6 @@ def _fmt_size(num_bytes):
 def _fmt_time(ts):
     if not ts:
         return "—"
-    import datetime
     return datetime.datetime.fromtimestamp(ts).strftime("%b %d, %I:%M %p")
 
 
@@ -151,18 +153,56 @@ def _enrich(job):
     return j
 
 
+def _disk_free_gb() -> float | None:
+    free = system_stats.disk_free_bytes(config.SCAN_ARCHIVE)
+    return round(free / (1024 ** 3), 1) if free is not None else None
+
+
 @app.route("/")
 def index():
     latest = db.get_latest_job()
     job = _enrich(latest) if latest else None
-    return render_template("index.html", job=job)
+    in_flight = db.get_in_flight_job()
+    in_flight = _enrich(in_flight) if in_flight else None
+
+    today_start = datetime.datetime.combine(datetime.date.today(), datetime.time.min).timestamp()
+    week_start = time.time() - 7 * 86400
+
+    stats = {
+        "temp_c": system_stats.pi_temperature_celsius(),
+        "throttled": system_stats.pi_throttled(),
+        "disk_free_gb": _disk_free_gb(),
+        "tailscale_online": system_stats.tailscale_online(),
+        "scans_today": db.count_jobs_since(today_start),
+        "scans_week": db.count_jobs_since(week_start),
+    }
+    email_stats = db.email_send_counts_since(week_start) if config.EMAIL_PROVIDER != "none" else None
+
+    return render_template(
+        "index.html", job=job, in_flight=in_flight, stats=stats, email_stats=email_stats,
+        active_page="home",
+    )
 
 
 @app.route("/details")
 def details():
     jobs = [_enrich(j) for j in db.list_jobs(limit=100)]
     failed_count = len(db.list_failed_jobs())
-    return render_template("details.html", jobs=jobs, failed_count=failed_count)
+    return render_template("details.html", jobs=jobs, failed_count=failed_count, active_page="history")
+
+
+@app.route("/help")
+def help_page():
+    return render_template(
+        "help.html",
+        active_page="help",
+        retention_days=config.RETENTION_DAYS,
+        email_provider=config.EMAIL_PROVIDER,
+        storage_provider=config.STORAGE_PROVIDER,
+        recipient_email=db.get_recipient_email() if config.EMAIL_PROVIDER != "none" else None,
+        scan_inbox=config.SCAN_INBOX,
+        scan_archive=config.SCAN_ARCHIVE,
+    )
 
 
 @app.route("/thumb/<int:job_id>")
@@ -239,7 +279,7 @@ def settings():
             else:
                 _record_login_failure(ip)
                 login_error = "Incorrect password."
-        return render_template("settings_login.html", error=login_error)
+        return render_template("settings_login.html", error=login_error, active_page="settings")
 
     error = None
     saved = False
@@ -258,6 +298,7 @@ def settings():
         is_override=db.get_setting("recipient_email") is not None,
         error=error,
         saved=saved,
+        active_page="settings",
     )
 
 

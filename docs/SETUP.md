@@ -125,9 +125,19 @@ few minutes on a Pi 3B rather than assuming it's hung; `jbig2` and
 
 ```bash
 sudo useradd -r -s /usr/sbin/nologin scanpipeline
+sudo usermod -aG video scanpipeline
 sudo mkdir -p /srv/scans/{inbox,processing,archive,failed,thumbnails}
 sudo chown -R scanpipeline:scanpipeline /srv/scans
 ```
+
+The `video` group membership is for the dashboard's Pi-temperature stat
+(`vcgencmd measure_temp`/`get_throttled`) — `/dev/vcio_gencmd` is
+group-owned by `video`, mode 660, and `scanpipeline` (a bare `-r` service
+account with no supplementary groups) can't open it otherwise. Without
+this, the dashboard doesn't error, the temperature stat just silently
+shows `—`. If you add this after the service is already running,
+`systemctl restart scan-dashboard.service` is required — group membership
+is resolved once at process start, not live.
 
 ## 3. Deploy the code
 
@@ -294,6 +304,14 @@ sudo systemctl enable --now scan-watcher.service
 sudo systemctl enable --now scan-dashboard.service
 sudo systemctl enable --now retention-cleanup.timer
 ```
+
+Want a bare `http://<host>/` URL instead of `:5000`? Set `DASHBOARD_PORT=80`
+in `.env` and restart `scan-dashboard.service`. `systemd/scan-dashboard.service`
+already carries `AmbientCapabilities=CAP_NET_BIND_SERVICE`, which lets the
+service bind port 80 directly without running as root or needing a reverse
+proxy — no other change needed on the systemd side. If you're also using the
+mDNS advertisement below, update `<port>` in `avahi/scanner-gateway.service`
+to match before copying it (it isn't read from `.env` automatically).
 
 Also install the mDNS advertisement so the dashboard is discoverable on the
 local network as "Scanner Gateway" (no Tailscale needed, LAN only — see

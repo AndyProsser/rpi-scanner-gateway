@@ -1,33 +1,26 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Settings</title>
-    <link rel="stylesheet" href="/static/style.css">
-</head>
-<body>
-<div class="container">
-    <h1>⚙️ Settings <a class="nav-link" href="/">Simple view</a> <a class="nav-link" href="/details">History</a></h1>
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Settings{% endblock %}
 
-    <div class="settings-card">
-        <label for="recipient_email">Recipient email</label>
-        <p class="meta">
-            {% if is_override %}
-            Custom value, set from this page — overrides RECIPIENT_EMAIL in .env.
-            {% else %}
-            Using the default from .env (RECIPIENT_EMAIL). Saving here overrides it
-            without needing a restart.
-            {% endif %}
-        </p>
-        <form method="post">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-            <input type="email" id="recipient_email" name="recipient_email" value="{{ recipient_email }}" required>
-            <button type="submit">Save</button>
-        </form>
-        {% if saved %}<p class="success-msg">Saved — takes effect on the next scan.</p>{% endif %}
-        {% if error %}<p class="error-msg">{{ error }}</p>{% endif %}
-    </div>
+{% block content %}
+<h1>Settings</h1>
+
+<div class="settings-card">
+    <label for="recipient_email">Recipient email</label>
+    <p class="meta">
+        {% if is_override %}
+        Custom value, set from this page — overrides RECIPIENT_EMAIL in .env.
+        {% else %}
+        Using the default from .env (RECIPIENT_EMAIL). Saving here overrides it
+        without needing a restart.
+        {% endif %}
+    </p>
+    <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="email" id="recipient_email" name="recipient_email" value="{{ recipient_email }}" required>
+        <button type="submit">Save</button>
+    </form>
+    {% if saved %}<p class="success-msg">{{ icon('check-circle', 14) }} Saved — takes effect on the next scan.</p>{% endif %}
+    {% if error %}<p class="error-msg">{{ icon('alert-triangle', 14) }} {{ error }}</p>{% endif %}
 </div>
-</body>
-</html>
+{% endblock %}

@@ -112,6 +112,34 @@ def get_latest_job():
         ).fetchone()
 
 
+def get_in_flight_job():
+    with get_db() as conn:
+        return conn.execute(
+            "SELECT * FROM jobs WHERE status IN ('received', 'ocr_running', 'uploading') "
+            "ORDER BY created_at DESC LIMIT 1"
+        ).fetchone()
+
+
+def count_jobs_since(cutoff_timestamp: float) -> int:
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) AS n FROM jobs WHERE created_at >= ?", (cutoff_timestamp,)
+        ).fetchone()
+        return row["n"]
+
+
+def email_send_counts_since(cutoff_timestamp: float) -> dict:
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT "
+            "  SUM(CASE WHEN email_sent = 1 THEN 1 ELSE 0 END) AS sent, "
+            "  SUM(CASE WHEN email_sent = 0 THEN 1 ELSE 0 END) AS not_sent "
+            "FROM jobs WHERE status = 'done' AND created_at >= ?",
+            (cutoff_timestamp,),
+        ).fetchone()
+        return {"sent": row["sent"] or 0, "not_sent": row["not_sent"] or 0}
+
+
 def jobs_older_than(cutoff_timestamp: float):
     with get_db() as conn:
         return conn.execute(
